@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 import yt_dlp
 import httpx
 
-app = FastAPI(title="Batch Adult Downloader - Auto MP4 Fixed")
+app = FastAPI(title="Batch Adult Downloader - 0KB Fixed")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -30,7 +30,7 @@ async def extract(request: Request):
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'format_sort': ['res', 'ext:mp4', 'size'],
         'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'
         }
     }
 
@@ -51,6 +51,7 @@ async def extract(request: Request):
                     results.append({
                         "title": info.get('title', 'Video').replace('/', '-').replace('\\', '-'),
                         "thumbnail": info.get('thumbnail'),
+                        "referer": info.get('webpage_url', 'https://www.xnxx.com/'),   # 🔥 PENTING
                         "best_format": {
                             "url": best.get('url'),
                             "quality": f"{best.get('height')}p",
@@ -63,36 +64,38 @@ async def extract(request: Request):
 
     return {"videos": results}
 
-# 🔥 PROXY DOWNLOAD BARU - FIX 0KB
+# 🔥 PROXY DOWNLOAD VERSI PALING KUAT
 @app.get("/download")
-async def download_video(url: str = Query(...), title: str = Query("video")):
+async def download_video(url: str = Query(...), title: str = Query("video"), referer: str = Query("https://www.xnxx.com/")):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-        "Accept": "video/mp4,video/*",
+        "Accept": "video/mp4,video/*,*/*",
         "Accept-Language": "id-ID,id;q=0.9,en;q=0.8",
         "Accept-Encoding": "gzip, deflate, br",
-        "Referer": "https://www.xnxx.com/",
+        "Referer": referer,                          # 🔥 Referer exact dari halaman video
         "Origin": "https://www.xnxx.com",
         "Sec-Fetch-Site": "cross-site",
         "Sec-Fetch-Mode": "no-cors",
         "Sec-Fetch-Dest": "video",
+        "Sec-Ch-Ua": '"Chromium";v="134", "Not;A=Brand";v="24", "Google Chrome";v="134"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
         "Connection": "keep-alive",
         "Pragma": "no-cache",
-        "Cache-Control": "no-cache"
+        "Cache-Control": "no-cache",
+        "Range": "bytes=0-"                          # 🔥 Paksa full content
     }
 
     try:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=120.0) as client:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=180.0) as client:
             async with client.stream("GET", url, headers=headers) as response:
-                if response.status_code != 200:
-                    return JSONResponse({
-                        "error": f"CDN Error: {response.status_code}"
-                    }, status_code=response.status_code)
+                if response.status_code not in (200, 206):
+                    return JSONResponse({"error": f"CDN blocked {response.status_code}"}, status_code=response.status_code)
 
                 filename = f"{title}.mp4".replace('"', '').replace("'", "").replace("/", "-")
                 
                 return StreamingResponse(
-                    response.aiter_bytes(chunk_size=1024*1024),  # 1MB chunk
+                    response.aiter_bytes(chunk_size=1024*1024),
                     media_type="video/mp4",
                     headers={
                         "Content-Disposition": f'attachment; filename="{filename}"',
