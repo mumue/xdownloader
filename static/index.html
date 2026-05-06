@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Universal Adult Downloader</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
+</head>
+<body class="bg-gray-950 text-white min-h-screen">
+  <div class="max-w-4xl mx-auto p-6">
+    <h1 class="text-4xl font-bold text-center mb-2">🔥 Universal Downloader</h1>
+    <p class="text-center text-red-400 mb-8">xnxx • xvideos • xhamster • pornhub • dll • No API</p>
+
+    <div class="bg-gray-900 rounded-3xl p-8 shadow-2xl">
+      <div class="flex gap-3">
+        <input id="urlInput" type="text" placeholder="Paste link di sini (single atau playlist)" 
+               class="flex-1 bg-gray-800 border border-gray-700 rounded-2xl px-6 py-5 focus:outline-none focus:border-red-500 text-lg">
+        <button onclick="extract()" 
+                class="bg-red-600 hover:bg-red-700 px-10 rounded-2xl font-bold flex items-center gap-3 text-lg">
+          <i class="fas fa-magic"></i> EXTRACT
+        </button>
+      </div>
+
+      <div id="result" class="mt-10 hidden"></div>
+    </div>
+
+    <p class="text-center text-xs text-gray-500 mt-10">Fast • Stabil • Bypass Anti-Bot • Deploy Vercel Gratis</p>
+  </div>
+
+  <script>
+    async function extract() {
+      const url = document.getElementById('urlInput').value.trim();
+      const resultDiv = document.getElementById('result');
+      if (!url) return alert("Masukkan link dulu bro!");
+
+      resultDiv.classList.remove('hidden');
+      resultDiv.innerHTML = `<p class="text-center py-12 text-gray-400"><i class="fas fa-spinner fa-spin text-3xl"></i><br>Sedang mengambil video...</p>`;
+
+      const res = await fetch('/extract', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({url})
+      });
+
+      const data = await res.json();
+
+      if (data.error) {
+        resultDiv.innerHTML = `<p class="text-red-500 text-center py-8">❌ ${data.error}</p>`;
+        return;
+      }
+
+      let html = '';
+      if (data.type === 'playlist') {
+        html = `<h2 class="text-2xl mb-6">${data.title} (${data.videos.length} video)</h2>`;
+        data.videos.forEach(v => {
+          html += `
+            <div class="bg-gray-800 rounded-2xl p-5 mb-6">
+              <div class="flex gap-4">
+                <img src="${v.thumbnail || ''}" class="w-28 h-20 object-cover rounded-xl">
+                <div class="flex-1">
+                  <p class="font-semibold text-lg">${v.title}</p>
+                  <div class="mt-4 flex flex-wrap gap-3">`;
+          v.formats.forEach(f => {
+            const size = f.filesize ? `(${Math.round(f.filesize/1024/1024)}MB)` : '';
+            html += `
+              <a href="${f.url}" target="_blank" 
+                 class="group bg-red-600 hover:bg-red-700 px-5 py-3 rounded-xl flex flex-col items-center text-sm">
+                <span class="font-bold">${f.quality}p ${f.ext}</span>
+                <span class="text-xs opacity-75">${size}</span>
+              </a>`;
+          });
+          html += `</div></div></div></div>`;
+        });
+      } else {
+        html = `<h2 class="text-2xl mb-6">${data.title}</h2>`;
+        html += `<div class="flex flex-wrap gap-4">`;
+        data.formats.forEach(f => {
+          const size = f.filesize ? `(${Math.round(f.filesize/1024/1024)}MB)` : '';
+          html += `
+            <div class="bg-gray-800 rounded-2xl p-4 w-52">
+              <a href="${f.url}" target="_blank" 
+                 class="block bg-red-600 hover:bg-red-700 text-center py-5 rounded-xl font-bold text-xl">
+                ${f.quality}p ${f.ext}
+              </a>
+              <p class="text-center text-xs mt-3 text-gray-400">${size}</p>
+              <button onclick="copyLink('${f.url}')" 
+                      class="mt-4 w-full text-xs border border-gray-600 hover:border-gray-400 py-2 rounded-xl">
+                📋 Copy Link
+              </button>
+            </div>`;
+        });
+        html += `</div>`;
+      }
+      resultDiv.innerHTML = html;
+    }
+
+    function copyLink(url) {
+      navigator.clipboard.writeText(url).then(() => {
+        alert("✅ Link berhasil dicopy!");
+      });
+    }
+  </script>
+</body>
+</html>
