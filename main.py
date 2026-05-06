@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 import yt_dlp
 
-app = FastAPI(title="Batch Adult Downloader - Best Quality")
+app = FastAPI(title="Batch Adult Downloader - Best MP4")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -26,6 +26,9 @@ async def extract(request: Request):
         'no_warnings': True,
         'ignoreerrors': True,
         'nocheckcertificate': True,
+        # 🔥 OPTIMASI BARU: Paksa ambil MP4 langsung (bukan HLS m3u8)
+        'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+        'format_sort': ['res', 'ext:mp4', 'size'],
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
@@ -35,17 +38,15 @@ async def extract(request: Request):
         for url in urls:
             try:
                 info = ydl.extract_info(url.strip(), download=False)
-                if not info:
-                    continue
+                if not info: continue
 
-                # Ambil format TERBAIK (highest resolution)
+                # Ambil format terbaik yang sudah difilter MP4
                 formats = sorted([
                     f for f in info.get('formats', [])
-                    if f.get('url') and f.get('ext') in ['mp4', 'webm'] and f.get('height')
+                    if f.get('url') and f.get('ext') == 'mp4' and f.get('height')
                 ], key=lambda x: (x.get('height') or 0, x.get('filesize') or 0), reverse=True)
 
                 best = formats[0] if formats else None
-
                 if best:
                     results.append({
                         "title": info.get('title', 'Video'),
@@ -54,11 +55,11 @@ async def extract(request: Request):
                         "best_format": {
                             "url": best.get('url'),
                             "quality": f"{best.get('height')}p",
-                            "ext": best.get('ext'),
+                            "ext": "mp4",
                             "filesize": best.get('filesize') or best.get('filesize_approx')
                         }
                     })
             except:
-                continue  # skip yang error
+                continue
 
     return {"videos": results}
