@@ -4,7 +4,7 @@ from fastapi.staticfiles import StaticFiles
 import yt_dlp
 import httpx
 
-app = FastAPI(title="Batch Adult Downloader - Direct MP4 + Proxy")
+app = FastAPI(title="Batch Adult Downloader - Auto MP4 Fixed")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -49,7 +49,7 @@ async def extract(request: Request):
                 best = formats[0] if formats else None
                 if best:
                     results.append({
-                        "title": info.get('title', 'Video').replace('/', '-'),
+                        "title": info.get('title', 'Video').replace('/', '-').replace('\\', '-'),
                         "thumbnail": info.get('thumbnail'),
                         "best_format": {
                             "url": best.get('url'),
@@ -63,27 +63,41 @@ async def extract(request: Request):
 
     return {"videos": results}
 
-# 🔥 PROXY DOWNLOAD - Bypass 403 Forbidden
+# 🔥 PROXY DOWNLOAD BARU - FIX 0KB
 @app.get("/download")
 async def download_video(url: str = Query(...), title: str = Query("video")):
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+        "Accept": "video/mp4,video/*",
+        "Accept-Language": "id-ID,id;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
         "Referer": "https://www.xnxx.com/",
         "Origin": "https://www.xnxx.com",
-        "Accept": "*/*"
+        "Sec-Fetch-Site": "cross-site",
+        "Sec-Fetch-Mode": "no-cors",
+        "Sec-Fetch-Dest": "video",
+        "Connection": "keep-alive",
+        "Pragma": "no-cache",
+        "Cache-Control": "no-cache"
     }
 
-    async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
-        async with client.stream("GET", url, headers=headers) as response:
-            if response.status_code != 200:
-                return JSONResponse({"error": f"403 Forbidden dari CDN ({response.status_code})"}, status_code=403)
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=120.0) as client:
+            async with client.stream("GET", url, headers=headers) as response:
+                if response.status_code != 200:
+                    return JSONResponse({
+                        "error": f"CDN Error: {response.status_code}"
+                    }, status_code=response.status_code)
 
-            filename = f"{title}.mp4".replace('"', '').replace("'", "")
-            return StreamingResponse(
-                response.aiter_bytes(1024 * 1024),  # stream per 1MB
-                media_type="video/mp4",
-                headers={
-                    "Content-Disposition": f'attachment; filename="{filename}"',
-                    "Content-Type": "video/mp4"
-                }
-            )
+                filename = f"{title}.mp4".replace('"', '').replace("'", "").replace("/", "-")
+                
+                return StreamingResponse(
+                    response.aiter_bytes(chunk_size=1024*1024),  # 1MB chunk
+                    media_type="video/mp4",
+                    headers={
+                        "Content-Disposition": f'attachment; filename="{filename}"',
+                        "Content-Type": "video/mp4"
+                    }
+                )
+    except Exception as e:
+        return JSONResponse({"error": f"Proxy error: {str(e)}"}, status_code=500)
