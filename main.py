@@ -1,9 +1,10 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Request, Query
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 import yt_dlp
+import httpx
 
-app = FastAPI(title="Batch Adult Downloader - Direct MP4")
+app = FastAPI(title="Batch Adult Downloader - Direct MP4 + Proxy")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -21,15 +22,13 @@ async def extract(request: Request):
         return JSONResponse({"error": "Masukkan minimal 1 link"}, status_code=400)
 
     results = []
-    
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
         'ignoreerrors': True,
         'nocheckcertificate': True,
-        # 🔥 OPTIMASI BARU UNTUK xnxx
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-        'format_sort': ['res', 'ext:mp4', 'size', 'proto:https'],
+        'format_sort': ['res', 'ext:mp4', 'size'],
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         }
@@ -39,30 +38,19 @@ async def extract(request: Request):
         for url in urls:
             try:
                 info = ydl.extract_info(url.strip(), download=False)
-                if not info:
-                    continue
+                if not info: continue
 
-                # 🔥 FILTER AGRESIF: Hanya ambil direct MP4 (bukan .m3u8)
                 formats = [
                     f for f in info.get('formats', [])
-                    if f.get('url')
-                    and f.get('ext') == 'mp4'                    # hanya mp4
-                    and '.m3u8' not in f.get('url', '')          # skip semua HLS
-                    and f.get('height') is not None
+                    if f.get('url') and f.get('ext') == 'mp4' and '.m3u8' not in f.get('url', '')
                 ]
-
-                # Sort dari resolusi tertinggi
-                formats = sorted(formats, 
-                               key=lambda x: (x.get('height') or 0, x.get('filesize') or 0), 
-                               reverse=True)
+                formats = sorted(formats, key=lambda x: (x.get('height') or 0, x.get('filesize') or 0), reverse=True)
 
                 best = formats[0] if formats else None
-
                 if best:
                     results.append({
-                        "title": info.get('title', 'Video'),
+                        "title": info.get('title', 'Video').replace('/', '-'),
                         "thumbnail": info.get('thumbnail'),
-                        "duration": info.get('duration'),
                         "best_format": {
                             "url": best.get('url'),
                             "quality": f"{best.get('height')}p",
@@ -70,13 +58,32 @@ async def extract(request: Request):
                             "filesize": best.get('filesize') or best.get('filesize_approx')
                         }
                     })
-                else:
-                    # Kalau tidak ada MP4 direct, kasih pesan
-                    results.append({
-                        "title": info.get('title', 'Video'),
-                        "error": "Tidak ada format MP4 direct (hanya HLS)"
-                    })
             except:
                 continue
 
     return {"videos": results}
+
+# 🔥 PROXY DOWNLOAD - Bypass 403 Forbidden
+@app.get("/download")
+async def download_video(url: str = Query(...), title: str = Query("video")):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Referer": "https://www.xnxx.com/",
+        "Origin": "https://www.xnxx.com",
+        "Accept": "*/*"
+    }
+
+    async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
+        async with client.stream("GET", url, headers=headers) as response:
+            if response.status_code != 200:
+                return JSONResponse({"error": f"403 Forbidden dari CDN ({response.status_code})"}, status_code=403)
+
+            filename = f"{title}.mp4".replace('"', '').replace("'", "")
+            return StreamingResponse(
+                response.aiter_bytes(1024 * 1024),  # stream per 1MB
+                media_type="video/mp4",
+                headers={
+                    "Content-Disposition": f'attachment; filename="{filename}"',
+                    "Content-Type": "video/mp4"
+                }
+            )
