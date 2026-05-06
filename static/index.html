@@ -3,102 +3,101 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Universal Adult Downloader</title>
+  <title>Batch Downloader - Best Quality</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
 </head>
 <body class="bg-gray-950 text-white min-h-screen">
-  <div class="max-w-4xl mx-auto p-6">
-    <h1 class="text-4xl font-bold text-center mb-2">🔥 Universal Downloader</h1>
-    <p class="text-center text-red-400 mb-8">xnxx • xvideos • xhamster • pornhub • dll • No API</p>
+  <div class="max-w-5xl mx-auto p-6">
+    <h1 class="text-4xl font-bold text-center mb-2">🔥 Batch Downloader</h1>
+    <p class="text-center text-red-400 mb-8">Multiple Links • Best Resolution • Real-time Progress</p>
 
-    <div class="bg-gray-900 rounded-3xl p-8 shadow-2xl">
-      <div class="flex gap-3">
-        <input id="urlInput" type="text" placeholder="Paste link di sini (single atau playlist)" 
-               class="flex-1 bg-gray-800 border border-gray-700 rounded-2xl px-6 py-5 focus:outline-none focus:border-red-500 text-lg">
-        <button onclick="extract()" 
-                class="bg-red-600 hover:bg-red-700 px-10 rounded-2xl font-bold flex items-center gap-3 text-lg">
-          <i class="fas fa-magic"></i> EXTRACT
-        </button>
-      </div>
+    <div class="bg-gray-900 rounded-3xl p-8">
+      <textarea id="urlsInput" rows="6"
+                class="w-full bg-gray-800 border border-gray-700 rounded-2xl p-6 text-lg focus:outline-none focus:border-red-500 resize-none"
+                placeholder="Paste banyak link di sini (1 link per baris)"></textarea>
+
+      <button onclick="extractBatch()" 
+              class="mt-4 w-full bg-red-600 hover:bg-red-700 py-5 rounded-2xl font-bold text-xl flex items-center justify-center gap-3">
+        <i class="fas fa-download"></i> EXTRACT SEMUA &amp; DOWNLOAD BEST QUALITY
+      </button>
 
       <div id="result" class="mt-10 hidden"></div>
     </div>
-
-    <p class="text-center text-xs text-gray-500 mt-10">Fast • Stabil • Bypass Anti-Bot • Deploy Vercel Gratis</p>
   </div>
 
   <script>
-    async function extract() {
-      const url = document.getElementById('urlInput').value.trim();
-      const resultDiv = document.getElementById('result');
-      if (!url) return alert("Masukkan link dulu bro!");
+    let downloadQueue = [];
 
+    async function extractBatch() {
+      const text = document.getElementById('urlsInput').value.trim();
+      if (!text) return alert("Paste link dulu bro!");
+
+      const urls = text.split('\n').filter(url => url.trim() !== '');
+      
+      const resultDiv = document.getElementById('result');
       resultDiv.classList.remove('hidden');
-      resultDiv.innerHTML = `<p class="text-center py-12 text-gray-400"><i class="fas fa-spinner fa-spin text-3xl"></i><br>Sedang mengambil video...</p>`;
+      resultDiv.innerHTML = `<p class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl"></i><br>Sedang mengambil best quality dari ${urls.length} link...</p>`;
 
       const res = await fetch('/extract', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({url})
+        body: JSON.stringify({urls})
       });
 
       const data = await res.json();
 
       if (data.error) {
-        resultDiv.innerHTML = `<p class="text-red-500 text-center py-8">❌ ${data.error}</p>`;
+        resultDiv.innerHTML = `<p class="text-red-500 text-center">${data.error}</p>`;
         return;
       }
 
-      let html = '';
-      if (data.type === 'playlist') {
-        html = `<h2 class="text-2xl mb-6">${data.title} (${data.videos.length} video)</h2>`;
-        data.videos.forEach(v => {
-          html += `
-            <div class="bg-gray-800 rounded-2xl p-5 mb-6">
-              <div class="flex gap-4">
-                <img src="${v.thumbnail || ''}" class="w-28 h-20 object-cover rounded-xl">
-                <div class="flex-1">
-                  <p class="font-semibold text-lg">${v.title}</p>
-                  <div class="mt-4 flex flex-wrap gap-3">`;
-          v.formats.forEach(f => {
-            const size = f.filesize ? `(${Math.round(f.filesize/1024/1024)}MB)` : '';
-            html += `
-              <a href="${f.url}" target="_blank" 
-                 class="group bg-red-600 hover:bg-red-700 px-5 py-3 rounded-xl flex flex-col items-center text-sm">
-                <span class="font-bold">${f.quality}p ${f.ext}</span>
-                <span class="text-xs opacity-75">${size}</span>
-              </a>`;
-          });
-          html += `</div></div></div></div>`;
-        });
-      } else {
-        html = `<h2 class="text-2xl mb-6">${data.title}</h2>`;
-        html += `<div class="flex flex-wrap gap-4">`;
-        data.formats.forEach(f => {
-          const size = f.filesize ? `(${Math.round(f.filesize/1024/1024)}MB)` : '';
-          html += `
-            <div class="bg-gray-800 rounded-2xl p-4 w-52">
-              <a href="${f.url}" target="_blank" 
-                 class="block bg-red-600 hover:bg-red-700 text-center py-5 rounded-xl font-bold text-xl">
-                ${f.quality}p ${f.ext}
-              </a>
-              <p class="text-center text-xs mt-3 text-gray-400">${size}</p>
-              <button onclick="copyLink('${f.url}')" 
-                      class="mt-4 w-full text-xs border border-gray-600 hover:border-gray-400 py-2 rounded-xl">
-                📋 Copy Link
-              </button>
-            </div>`;
-        });
-        html += `</div>`;
-      }
+      let html = `<h2 class="text-2xl mb-6">✅ Ditemukan ${data.videos.length} video (Best Quality)</h2>`;
+      html += `<button onclick="startAllDownloads()" class="mb-6 bg-green-600 hover:bg-green-700 px-8 py-3 rounded-2xl font-bold">⬇️ DOWNLOAD SEMUA SEKARANG</button>`;
+
+      data.videos.forEach((v, i) => {
+        const size = v.best_format.filesize ? `(${(v.best_format.filesize/1024/1024).toFixed(1)} MB)` : '';
+        html += `
+          <div class="bg-gray-800 rounded-2xl p-5 mb-4 flex gap-4 items-center" id="video-${i}">
+            <img src="${v.thumbnail || ''}" class="w-24 h-16 object-cover rounded-xl">
+            <div class="flex-1">
+              <p class="font-semibold">${v.title}</p>
+              <p class="text-red-400">${v.best_format.quality} ${v.best_format.ext} ${size}</p>
+              <div class="mt-3 h-2 bg-gray-700 rounded-full overflow-hidden">
+                <div id="progress-${i}" class="h-2 bg-red-500 w-0 transition-all"></div>
+              </div>
+            </div>
+            <button onclick="downloadSingle(${i})" 
+                    class="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-2xl font-semibold">DOWNLOAD</button>
+          </div>`;
+      });
+
       resultDiv.innerHTML = html;
+      downloadQueue = data.videos; // simpan untuk download all
     }
 
-    function copyLink(url) {
-      navigator.clipboard.writeText(url).then(() => {
-        alert("✅ Link berhasil dicopy!");
-      });
+    function downloadSingle(index) {
+      const video = downloadQueue[index];
+      const link = document.createElement('a');
+      link.href = video.best_format.url;
+      link.download = `${video.title}.${video.best_format.ext}`;
+      link.click();
+      updateProgress(index, 100); // langsung 100% karena browser handle
+    }
+
+    async function startAllDownloads() {
+      for (let i = 0; i < downloadQueue.length; i++) {
+        updateProgress(i, 30); // mulai
+        downloadSingle(i);
+        await new Promise(r => setTimeout(r, 800)); // jeda biar tidak banjir
+        updateProgress(i, 100);
+      }
+      alert("✅ Semua download sudah dimulai ke folder Downloads kamu!");
+    }
+
+    function updateProgress(index, percent) {
+      const bar = document.getElementById(`progress-${index}`);
+      if (bar) bar.style.width = `${percent}%`;
     }
   </script>
 </body>
