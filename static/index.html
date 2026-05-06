@@ -3,23 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Batch Downloader - Best Quality</title>
+  <title>Batch Downloader - Direct MP4</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
 </head>
 <body class="bg-gray-950 text-white min-h-screen">
   <div class="max-w-5xl mx-auto p-6">
     <h1 class="text-4xl font-bold text-center mb-2">🔥 Batch Downloader</h1>
-    <p class="text-center text-red-400 mb-8">Multiple Links • Best Resolution • Real-time Progress</p>
+    <p class="text-center text-red-400 mb-8">Multiple Links • Best MP4 • Bypass 403</p>
 
     <div class="bg-gray-900 rounded-3xl p-8">
-      <textarea id="urlsInput" rows="6"
-                class="w-full bg-gray-800 border border-gray-700 rounded-2xl p-6 text-lg focus:outline-none focus:border-red-500 resize-none"
-                placeholder="Paste banyak link di sini (1 link per baris)"></textarea>
+      <textarea id="urlsInput" rows="6" class="w-full bg-gray-800 border border-gray-700 rounded-2xl p-6 text-lg focus:outline-none focus:border-red-500 resize-none" placeholder="Paste banyak link di sini (1 link per baris)"></textarea>
 
-      <button onclick="extractBatch()" 
-              class="mt-4 w-full bg-red-600 hover:bg-red-700 py-5 rounded-2xl font-bold text-xl flex items-center justify-center gap-3">
-        <i class="fas fa-download"></i> EXTRACT SEMUA &amp; DOWNLOAD BEST QUALITY
+      <button onclick="extractBatch()" class="mt-4 w-full bg-red-600 hover:bg-red-700 py-5 rounded-2xl font-bold text-xl flex items-center justify-center gap-3">
+        <i class="fas fa-download"></i> EXTRACT SEMUA &amp; DOWNLOAD BEST MP4
       </button>
 
       <div id="result" class="mt-10 hidden"></div>
@@ -33,71 +30,58 @@
       const text = document.getElementById('urlsInput').value.trim();
       if (!text) return alert("Paste link dulu bro!");
 
-      const urls = text.split('\n').filter(url => url.trim() !== '');
-      
+      const urls = text.split('\n').filter(u => u.trim());
       const resultDiv = document.getElementById('result');
       resultDiv.classList.remove('hidden');
-      resultDiv.innerHTML = `<p class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl"></i><br>Sedang mengambil best quality dari ${urls.length} link...</p>`;
+      resultDiv.innerHTML = `<p class="text-center py-12"><i class="fas fa-spinner fa-spin text-4xl"></i><br>Sedang mengambil best MP4...</p>`;
 
       const res = await fetch('/extract', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({urls})
       });
-
       const data = await res.json();
 
-      if (data.error) {
-        resultDiv.innerHTML = `<p class="text-red-500 text-center">${data.error}</p>`;
-        return;
-      }
-
-      let html = `<h2 class="text-2xl mb-6">✅ Ditemukan ${data.videos.length} video (Best Quality)</h2>`;
-      html += `<button onclick="startAllDownloads()" class="mb-6 bg-green-600 hover:bg-green-700 px-8 py-3 rounded-2xl font-bold">⬇️ DOWNLOAD SEMUA SEKARANG</button>`;
+      let html = `<h2 class="text-2xl mb-6">✅ Ditemukan ${data.videos.length} video</h2>`;
+      html += `<button onclick="startAllDownloads()" class="mb-6 bg-green-600 hover:bg-green-700 px-8 py-3 rounded-2xl font-bold">⬇️ DOWNLOAD SEMUA</button>`;
 
       data.videos.forEach((v, i) => {
         const size = v.best_format.filesize ? `(${(v.best_format.filesize/1024/1024).toFixed(1)} MB)` : '';
         html += `
-          <div class="bg-gray-800 rounded-2xl p-5 mb-4 flex gap-4 items-center" id="video-${i}">
+          <div class="bg-gray-800 rounded-2xl p-5 mb-4 flex gap-4 items-center">
             <img src="${v.thumbnail || ''}" class="w-24 h-16 object-cover rounded-xl">
             <div class="flex-1">
               <p class="font-semibold">${v.title}</p>
-              <p class="text-red-400">${v.best_format.quality} ${v.best_format.ext} ${size}</p>
-              <div class="mt-3 h-2 bg-gray-700 rounded-full overflow-hidden">
-                <div id="progress-${i}" class="h-2 bg-red-500 w-0 transition-all"></div>
-              </div>
+              <p class="text-red-400">${v.best_format.quality} MP4 ${size}</p>
             </div>
-            <button onclick="downloadSingle(${i})" 
-                    class="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-2xl font-semibold">DOWNLOAD</button>
+            <button onclick="downloadSingle('${v.best_format.url}', '${v.title}')" 
+                    class="bg-red-600 hover:bg-red-700 px-6 py-3 rounded-2xl font-semibold">DOWNLOAD MP4</button>
           </div>`;
       });
 
       resultDiv.innerHTML = html;
-      downloadQueue = data.videos; // simpan untuk download all
+      downloadQueue = data.videos;
     }
 
-    function downloadSingle(index) {
-      const video = downloadQueue[index];
+    async function downloadSingle(url, title) {
+      const btns = document.querySelectorAll('button');
+      // simple loading
+      const res = await fetch(`/download?url=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`);
+      if (!res.ok) return alert("Gagal download (403)");
+
+      const blob = await res.blob();
       const link = document.createElement('a');
-      link.href = video.best_format.url;
-      link.download = `${video.title}.${video.best_format.ext}`;
+      link.href = URL.createObjectURL(blob);
+      link.download = `${title}.mp4`;
       link.click();
-      updateProgress(index, 100); // langsung 100% karena browser handle
     }
 
     async function startAllDownloads() {
-      for (let i = 0; i < downloadQueue.length; i++) {
-        updateProgress(i, 30); // mulai
-        downloadSingle(i);
-        await new Promise(r => setTimeout(r, 800)); // jeda biar tidak banjir
-        updateProgress(i, 100);
+      for (let v of downloadQueue) {
+        await downloadSingle(v.best_format.url, v.title);
+        await new Promise(r => setTimeout(r, 1200)); // jeda agar tidak banjir
       }
-      alert("✅ Semua download sudah dimulai ke folder Downloads kamu!");
-    }
-
-    function updateProgress(index, percent) {
-      const bar = document.getElementById(`progress-${index}`);
-      if (bar) bar.style.width = `${percent}%`;
+      alert("✅ Semua download sudah dimulai!");
     }
   </script>
 </body>
