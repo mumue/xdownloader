@@ -1,10 +1,9 @@
 from fastapi import FastAPI, Request, Query
-from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 import yt_dlp
-import httpx
 
-app = FastAPI(title="Batch Adult Downloader - Fixed 0KB + HLS")
+app = FastAPI(title="Batch Adult Downloader - Fixed Stuck Download")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -29,7 +28,6 @@ async def extract(request: Request):
         'nocheckcertificate': True,
         'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         'format_sort': ['res', 'ext:mp4', 'size', 'vcodec:avc'],
-        'merge_output_format': 'mp4',
         'http_headers': {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36'
         }
@@ -42,7 +40,6 @@ async def extract(request: Request):
                 if not info:
                     continue
 
-                # PERBAIKAN UTAMA: tidak skip m3u8 lagi + ambil format terbaik
                 formats = [
                     f for f in info.get('formats', [])
                     if f.get('url') and f.get('ext') in ('mp4', 'm4a')
@@ -58,44 +55,18 @@ async def extract(request: Request):
                     results.append({
                         "title": info.get('title', 'Video').replace('/', '-').replace('\\', '-'),
                         "thumbnail": info.get('thumbnail'),
-                        "referer": info.get('webpage_url', 'https://www.txnhh.com/'),
-                        "best_format": {
-                            "url": best.get('url'),
-                            "quality": f"{best.get('height') or 'HD'}p",
-                            "ext": "mp4",
-                            "filesize": best.get('filesize') or best.get('filesize_approx')
-                        }
+                        "referer": "https://www.txnhh.com/",
+                        "direct_url": best.get('url'),           # ← ini yang baru
+                        "quality": f"{best.get('height') or 'HD'}p"
                     })
             except:
                 continue
 
     return {"videos": results}
 
+# PERBAIKAN UTAMA: sekarang langsung redirect ke CDN (tidak proxy lagi)
 @app.get("/download")
-async def download_video(url: str = Query(...), title: str = Query("video"), referer: str = Query("https://www.txnhh.com/")):
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-        "Accept": "video/mp4,video/*,*/*",
-        "Referer": referer,
-        "Origin": "https://www.txnhh.com",
-        "Range": "bytes=0-"
-    }
-
-    try:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=180.0) as client:
-            async with client.stream("GET", url, headers=headers) as response:
-                if response.status_code not in (200, 206):
-                    return JSONResponse({"error": f"CDN blocked {response.status_code}"}, status_code=response.status_code)
-
-                filename = f"{title}.mp4".replace('"', '').replace("'", "").replace("/", "-")
-                
-                return StreamingResponse(
-                    response.aiter_bytes(chunk_size=1024*1024),
-                    media_type="video/mp4",
-                    headers={
-                        "Content-Disposition": f'attachment; filename="{filename}"',
-                        "Content-Type": "video/mp4"
-                    }
-                )
-    except Exception as e:
-        return JSONResponse({"error": f"Proxy error: {str(e)}"}, status_code=500)
+async def download_video(url: str = Query(...), title: str = Query("video")):
+    filename = f"{title}.mp4".replace('"', '').replace("'", "").replace("/", "-")
+    # Redirect langsung ke video URL asli (browser yang download)
+    return RedirectResponse(url=url, status_code=302)
