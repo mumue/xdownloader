@@ -3,20 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Batch Downloader - Auto MP4</title>
+  <title>Batch Streamer - Open in New Tab</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
 </head>
 <body class="bg-gray-950 text-white min-h-screen">
   <div class="max-w-5xl mx-auto p-6">
-    <h1 class="text-4xl font-bold text-center mb-2">🔥 Batch Downloader</h1>
-    <p class="text-center text-red-400 mb-8">Multiple Links • Best MP4 • Auto Download (0KB Fixed)</p>
+    <h1 class="text-4xl font-bold text-center mb-2">🔥 Batch Streamer</h1>
+    <p class="text-center text-red-400 mb-8">Multiple Links • Best MP4 • Open Streaming di Tab Baru</p>
 
     <div class="bg-gray-900 rounded-3xl p-8">
-      <textarea id="urlsInput" rows="6" class="w-full bg-gray-800 border border-gray-700 rounded-2xl p-6 text-lg focus:outline-none focus:border-red-500 resize-none" placeholder="Paste banyak link xnxx di sini (1 link per baris)"></textarea>
+      <textarea id="urlsInput" rows="6" class="w-full bg-gray-800 border border-gray-700 rounded-2xl p-6 text-lg focus:outline-none focus:border-red-500 resize-none" 
+                placeholder="Paste banyak link txnhh.com / xnxx di sini (1 link per baris)"></textarea>
 
-      <button onclick="extractAndAutoDownload()" class="mt-4 w-full bg-red-600 hover:bg-red-700 py-5 rounded-2xl font-bold text-xl flex items-center justify-center gap-3">
-        <i class="fas fa-download"></i> EXTRACT &amp; AUTO DOWNLOAD BEST MP4
+      <button onclick="extractAndOpenTabs()" 
+              class="mt-4 w-full bg-red-600 hover:bg-red-700 py-5 rounded-2xl font-bold text-xl flex items-center justify-center gap-3">
+        <i class="fas fa-play"></i> EXTRACT &amp; BUKA SEMUA DI TAB BARU (Streaming)
       </button>
 
       <div id="result" class="mt-10 hidden"></div>
@@ -24,9 +26,7 @@
   </div>
 
   <script>
-    let downloadQueue = [];
-
-    async function extractAndAutoDownload() {
+    async function extractAndOpenTabs() {
       const text = document.getElementById('urlsInput').value.trim();
       if (!text) return alert("Paste link dulu bro!");
 
@@ -42,60 +42,39 @@
       });
       const data = await res.json();
 
-      let html = `<h2 class="text-2xl mb-4">✅ Ditemukan ${data.videos.length} video • Auto download...</h2>`;
+      if (data.videos.length === 0) {
+        resultDiv.innerHTML = `<p class="text-red-400 text-center py-8">❌ Tidak ada video yang berhasil diambil</p>`;
+        return;
+      }
+
+      let html = `<h2 class="text-2xl mb-6 text-green-400">✅ Ditemukan ${data.videos.length} video</h2>`;
+      
       data.videos.forEach((v, i) => {
         html += `
-          <div class="bg-gray-800 rounded-2xl p-5 mb-4 flex gap-4 items-center" id="video-${i}">
-            <img src="${v.thumbnail || ''}" class="w-24 h-16 object-cover rounded-xl">
+          <div class="bg-gray-800 rounded-2xl p-5 mb-4 flex gap-4 items-center hover:bg-gray-700 transition">
+            <img src="${v.thumbnail || ''}" class="w-28 h-20 object-cover rounded-xl">
             <div class="flex-1">
-              <p class="font-semibold">${v.title}</p>
-              <p class="text-red-400">${v.best_format.quality} MP4</p>
-              <div class="mt-3 h-2 bg-gray-700 rounded-full overflow-hidden">
-                <div id="progress-${i}" class="h-2 bg-green-500 w-0 transition-all"></div>
-              </div>
+              <p class="font-semibold line-clamp-2">${v.title}</p>
+              <p class="text-red-400 text-sm mt-1">${v.quality} • Streaming Ready</p>
             </div>
-            <span id="status-${i}" class="text-sm text-gray-400">Menunggu...</span>
+            <button onclick="openVideo('${v.direct_url}', '${v.title}')" 
+                    class="bg-green-600 hover:bg-green-700 px-8 py-3 rounded-2xl font-bold flex items-center gap-2">
+              <i class="fas fa-play"></i> PLAY
+            </button>
           </div>`;
       });
 
-      resultDiv.innerHTML = html;
-      downloadQueue = data.videos;
-      autoDownloadAll();
+      resultDiv.innerHTML = html + `<p class="text-center text-gray-400 mt-8 text-sm">Klik tombol PLAY untuk buka streaming di tab baru</p>`;
     }
 
-    async function autoDownloadAll() {
-      for (let i = 0; i < downloadQueue.length; i++) {
-        const v = downloadQueue[i];
-        document.getElementById(`status-${i}`).textContent = "Downloading...";
-        updateProgress(i, 20);
-
-        try {
-          const res = await fetch(`/download?url=${encodeURIComponent(v.best_format.url)}&title=${encodeURIComponent(v.title)}&referer=${encodeURIComponent(v.referer)}`);
-          
-          if (!res.ok) throw new Error("Gagal");
-
-          const blob = await res.blob();
-          if (blob.size < 100000) throw new Error("File terlalu kecil");
-
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          link.download = `${v.title}.mp4`;
-          link.click();
-
-          updateProgress(i, 100);
-          document.getElementById(`status-${i}`).innerHTML = `<span class="text-green-400">✅ Selesai (${(blob.size/1024/1024).toFixed(1)} MB)</span>`;
-        } catch (e) {
-          document.getElementById(`status-${i}`).innerHTML = `<span class="text-red-400">❌ Gagal</span>`;
-        }
-
-        if (i < downloadQueue.length - 1) await new Promise(r => setTimeout(r, 1800));
+    function openVideo(url, title) {
+      const safeTitle = title.replace(/[^a-zA-Z0-9]/g, '_');
+      const win = window.open(url, '_blank');
+      if (win) {
+        win.focus();
+      } else {
+        alert("Pop-up diblokir! Izinkan pop-up di browser kamu.");
       }
-      alert("✅ Semua video sudah selesai di-download otomatis!");
-    }
-
-    function updateProgress(index, percent) {
-      const bar = document.getElementById(`progress-${index}`);
-      if (bar) bar.style.width = `${percent}%`;
     }
   </script>
 </body>
